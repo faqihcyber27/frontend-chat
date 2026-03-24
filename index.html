@@ -48,7 +48,6 @@ body{
   flex-direction:column;
 }
 
-/* BUBBLE */
 .bubble{
   max-width:75%;
   padding:10px 12px;
@@ -80,16 +79,30 @@ img{
   border-radius:10px;
 }
 
-/* INPUT */
+/* INPUT BAR */
 .input{
   display:flex;
   align-items:center;
-  padding:10px;
+  padding:8px;
   background:#fff;
   gap:8px;
   border-top:1px solid #ddd;
 }
 
+/* PLUS BUTTON */
+.plus{
+  width:36px;
+  height:36px;
+  border-radius:50%;
+  background:#e5e5ea;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:20px;
+  cursor:pointer;
+}
+
+/* TEXT INPUT */
 .text-input{
   flex:1;
   padding:10px;
@@ -97,20 +110,7 @@ img{
   border:1px solid #ccc;
 }
 
-/* PLUS BUTTON */
-.plus{
-  width:40px;
-  height:40px;
-  border-radius:50%;
-  background:#e5e5ea;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:22px;
-  cursor:pointer;
-}
-
-/* SEND */
+/* SEND BUTTON */
 .send-btn{
   background:#0b93f6;
   color:#fff;
@@ -137,6 +137,7 @@ input[type="file"]{
 
 <div id="app" class="app">
 
+<!-- HEADER -->
 <div class="header">
   <div class="avatar">{{ username.charAt(0).toUpperCase() }}</div>
   <div>
@@ -145,6 +146,7 @@ input[type="file"]{
   </div>
 </div>
 
+<!-- CHAT -->
 <div class="messages" ref="msgBox" @scroll="handleScroll">
   <div v-for="m in chat" :class="['bubble', m.me?'sent':'received']">
 
@@ -164,14 +166,13 @@ input[type="file"]{
   {{ typingUser }} mengetik...
 </div>
 
+<!-- INPUT -->
 <div class="input">
 
-  <!-- PLUS BUTTON -->
+  <!-- PLUS -->
   <div class="plus" @click="openFile">+</div>
 
-  <!-- HIDDEN FILE -->
-  <input type="file" ref="file" @change="sendImage">
-
+  <!-- TEXT -->
   <input class="text-input"
     v-model="message"
     @input="typing"
@@ -179,7 +180,11 @@ input[type="file"]{
     placeholder="Type a message..."
   >
 
+  <!-- SEND -->
   <button class="send-btn" @click="send">➤</button>
+
+  <!-- HIDDEN FILE -->
+  <input type="file" ref="file" @change="sendImage">
 
 </div>
 
