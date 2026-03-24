@@ -1,8 +1,18 @@
-self.addEventListener("push", e => {
+self.addEventListener("install", e=>{
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", e=>{
+  clients.claim();
+});
+
+self.addEventListener("push", e=>{
+  if (!e.data) return;
+
   const data = e.data.json();
 
-  self.registration.showNotification(data.title, {
-    body: data.body,
-    icon: "https://cdn-icons-png.flaticon.com/512/733/733585.png"
+  self.registration.showNotification(data.title,{
+    body:data.body,
+    icon:"/icon.png"
   });
 });
