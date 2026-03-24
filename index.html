@@ -3,141 +3,119 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vue Chat Realtime</title>
+<title>Chat App</title>
 
-<!-- Vue CDN -->
 <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 
 <style>
 :root{
   --bg:#f0f2f5;
+  --sidebar:#fff;
   --chat:#e5ddd5;
   --green:#25d366;
 }
 
-body{
-  margin:0;
-  font-family:sans-serif;
-  background:var(--bg);
-}
+body{margin:0;font-family:sans-serif;background:var(--bg);}
 
-.container{
+.app{display:flex;height:100vh;}
+
+/* SIDEBAR */
+.sidebar{
+  width:30%;
+  background:var(--sidebar);
+  border-right:1px solid #ddd;
   display:flex;
   flex-direction:column;
-  height:100vh;
 }
 
-.header{
-  background:#fff;
-  padding:10px;
-  display:flex;
-  align-items:center;
-  gap:10px;
-  border-bottom:1px solid #ddd;
-}
+.profile{padding:10px;border-bottom:1px solid #eee;}
+.profile input{width:100%;padding:8px;border-radius:10px;border:1px solid #ccc;}
 
-.avatar{
-  width:40px;
-  height:40px;
-  border-radius:50%;
-  background:#ccc;
-}
+.chat-list{flex:1;overflow:auto;}
+.chat-item{display:flex;padding:10px;gap:10px;cursor:pointer;}
+.chat-item:hover{background:#f5f5f5;}
 
-.messages{
-  flex:1;
-  overflow:auto;
-  padding:10px;
-  display:flex;
-  flex-direction:column;
-  background:var(--chat);
-}
+.avatar{width:40px;height:40px;border-radius:50%;background:#ccc;display:flex;align-items:center;justify-content:center;font-weight:bold;}
 
-.bubble{
-  max-width:75%;
-  padding:8px 10px;
-  margin:5px 0;
-  border-radius:10px;
-  animation:fade .2s;
-}
+.chat-info{flex:1;}
+.chat-name{font-weight:bold;}
+.chat-last{font-size:12px;color:#666}
 
-.sent{
-  align-self:flex-end;
-  background:var(--green);
-  color:#fff;
-}
+/* CHAT */
+.chat{flex:1;display:flex;flex-direction:column;}
 
-.received{
-  align-self:flex-start;
-  background:#fff;
-}
+.header{padding:10px;background:#fff;border-bottom:1px solid #ddd;display:flex;gap:10px;}
 
-.name{
-  font-size:11px;
-  font-weight:bold;
-  opacity:.6;
-}
+.messages{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column;background:var(--chat);}
 
-.input-area{
-  display:flex;
-  padding:10px;
-  background:#fff;
-  gap:10px;
-}
+.bubble{max-width:70%;padding:8px 10px;margin:5px;border-radius:10px;}
+.sent{align-self:flex-end;background:var(--green);color:#fff;}
+.received{align-self:flex-start;background:#fff;}
 
-input{
-  flex:1;
-  padding:10px;
-  border-radius:20px;
-  border:1px solid #ccc;
-}
+.name{font-size:11px;font-weight:bold;opacity:.6;}
+.time{font-size:10px;text-align:right;opacity:.5;}
 
-button{
-  background:var(--green);
-  color:#fff;
-  border:none;
-  padding:10px 15px;
-  border-radius:50%;
-}
+.input-area{display:flex;padding:10px;background:#fff;gap:10px;}
+.input-area input{flex:1;padding:10px;border-radius:20px;border:1px solid #ccc;}
+button{background:var(--green);border:none;color:#fff;padding:10px 15px;border-radius:50%;}
 
-.name-box{
-  padding:10px;
-  background:#fff;
-  border-bottom:1px solid #ddd;
-}
+.typing{font-size:12px;color:#555;padding-left:10px;}
 
-@keyframes fade{
-  from{opacity:0;transform:translateY(5px)}
-  to{opacity:1}
+@media(max-width:768px){
+  .sidebar{display:none}
 }
 </style>
 </head>
 
 <body>
 
-<div id="app" class="container">
+<div id="app" class="app">
 
-<div class="name-box">
-  <input v-model="username" placeholder="Masukkan nama kamu..." />
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="profile">
+    <input v-model="username" placeholder="Nama kamu...">
+  </div>
+
+  <div class="chat-list">
+    <div class="chat-item">
+      <div class="avatar">G</div>
+      <div class="chat-info">
+        <div class="chat-name">Global Chat</div>
+        <div class="chat-last">{{ lastMessage }}</div>
+      </div>
+    </div>
+  </div>
 </div>
 
+<!-- CHAT -->
+<div class="chat">
+
 <div class="header">
-  <div class="avatar"></div>
+  <div class="avatar">G</div>
   <div>
-    <b>Global Chat</b><br>
+    <div><b>Global Chat</b></div>
     <small>{{ status }}</small>
   </div>
 </div>
 
 <div class="messages" ref="messages">
-  <div v-for="(m,i) in chat" :key="i" :class="['bubble', m.me ? 'sent':'received']">
-    <div class="name">{{ m.user }}</div>
+  <div v-for="(m,i) in chat" :key="i" :class="['bubble', m.me?'sent':'received']">
+    <div class="name" :style="{color:getColor(m.user)}">{{ m.user }}</div>
     <div>{{ m.msg }}</div>
+    <div class="time">{{ m.time }}</div>
   </div>
 </div>
 
+<div class="typing" v-if="typingUser">
+  {{ typingUser }} sedang mengetik...
+</div>
+
 <div class="input-area">
-  <input v-model="message" @keydown.enter="send" placeholder="Ketik pesan..." />
+  <input v-model="message" @input="sendTyping" @keydown.enter="send" placeholder="Ketik pesan...">
   <button @click="send">➤</button>
+</div>
+
 </div>
 
 </div>
@@ -146,78 +124,105 @@ button{
 const { createApp } = Vue;
 
 createApp({
-  data(){
-    return{
-      ws:null,
-      status:'connecting...',
-      username:'',
-      message:'',
-      chat:[],
-      clientId: Math.random().toString(36).substring(2),
-      WS_URL: "wss://chat-realtime.jihadwajib68.workers.dev"
-    }
-  },
+data(){
+return{
+ws:null,
+status:'connecting...',
+username:'',
+message:'',
+chat:[],
+typingUser:'',
+clientId:Math.random().toString(36).substring(2),
+WS_URL:"wss://chat-realtime.jihadwajib68.workers.dev"
+}
+},
 
-  mounted(){
-    this.connect();
-  },
+computed:{
+lastMessage(){
+return this.chat.length ? this.chat[this.chat.length-1].msg : 'Belum ada pesan';
+}
+},
 
-  methods:{
-    connect(){
-      try{
-        this.ws = new WebSocket(this.WS_URL);
+mounted(){
+this.connect();
+},
 
-        this.ws.onopen = ()=> this.status='online';
-        this.ws.onclose = ()=> this.status='offline';
-        this.ws.onerror = ()=> this.status='error';
+methods:{
+connect(){
+this.ws=new WebSocket(this.WS_URL);
 
-        this.ws.onmessage = (e)=>{
-          let data;
+this.ws.onopen=()=>this.status='online';
+this.ws.onclose=()=>this.status='offline';
 
-          try{
-            data = JSON.parse(e.data);
-          }catch{
-            data = { user:"User", msg:e.data };
-          }
+this.ws.onmessage=(e)=>{
+let data;
+try{
+data=JSON.parse(e.data);
+}catch{
+data={user:"User",msg:e.data};
+}
 
-          if(data.clientId === this.clientId) return;
+if(data.clientId===this.clientId) return;
 
-          this.chat.push({...data, me:false});
-          this.$nextTick(()=> this.scrollBottom());
-        };
+// typing indicator
+if(data.typing){
+this.typingUser=data.user;
+setTimeout(()=>this.typingUser='',1000);
+return;
+}
 
-      }catch(err){
-        alert(err);
-      }
-    },
+data.time=new Date().toLocaleTimeString().slice(0,5);
 
-    send(){
-      if(!this.username){
-        alert("Isi nama dulu!");
-        return;
-      }
+this.chat.push({...data,me:false});
+this.$nextTick(()=>this.scroll());
+};
+},
 
-      if(!this.message || !this.ws || this.ws.readyState!==1) return;
+send(){
+if(!this.username){
+alert("Isi nama dulu!");
+return;
+}
 
-      const payload={
-        user:this.username,
-        msg:this.message,
-        clientId:this.clientId
-      };
+if(!this.message || this.ws.readyState!==1) return;
 
-      this.ws.send(JSON.stringify(payload));
+const payload={
+user:this.username,
+msg:this.message,
+clientId:this.clientId
+};
 
-      this.chat.push({...payload, me:true});
-      this.message='';
+this.ws.send(JSON.stringify(payload));
 
-      this.$nextTick(()=> this.scrollBottom());
-    },
+payload.time=new Date().toLocaleTimeString().slice(0,5);
 
-    scrollBottom(){
-      const el = this.$refs.messages;
-      el.scrollTop = el.scrollHeight;
-    }
-  }
+this.chat.push({...payload,me:true});
+this.message='';
+
+this.$nextTick(()=>this.scroll());
+},
+
+sendTyping(){
+if(this.ws.readyState!==1 || !this.username) return;
+
+this.ws.send(JSON.stringify({
+user:this.username,
+typing:true,
+clientId:this.clientId
+}));
+},
+
+scroll(){
+const el=this.$refs.messages;
+el.scrollTop=el.scrollHeight;
+},
+
+getColor(name){
+const colors=['#e91e63','#3f51b5','#009688','#ff9800','#9c27b0'];
+let i=name.length % colors.length;
+return colors[i];
+}
+}
 }).mount("#app");
 </script>
 
