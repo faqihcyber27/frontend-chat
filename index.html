@@ -2,27 +2,128 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<link rel="manifest" href="manifest.json">
-
 <script src="https://unpkg.com/vue@3"></script>
 
 <style>
-body{margin:0;font-family:sans-serif;background:#e5ddd5}
-.app{display:flex;flex-direction:column;height:100vh}
+body{
+  margin:0;
+  font-family:system-ui;
+  background:#f2f2f2;
+}
 
-.header{background:#075e54;color:#fff;padding:10px;display:flex;justify-content:space-between}
-.messages{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column}
+/* APP */
+.app{
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+}
 
-.bubble{padding:8px;margin:5px;border-radius:10px;max-width:70%}
-.sent{align-self:flex-end;background:#25d366;color:#fff}
-.received{align-self:flex-start;background:#fff}
-.system{align-self:center;background:#ddd;font-size:12px}
+/* HEADER */
+.header{
+  background:#0b93f6;
+  color:#fff;
+  padding:12px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
 
-img{max-width:150px;border-radius:10px}
+.avatar{
+  width:35px;
+  height:35px;
+  border-radius:50%;
+  background:#fff;
+  color:#0b93f6;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:bold;
+}
 
-.input{display:flex;padding:10px;background:#fff;gap:5px}
-input{flex:1;padding:10px;border-radius:20px;border:1px solid #ccc}
+.status{
+  font-size:12px;
+  opacity:.8;
+}
+
+/* CHAT AREA */
+.messages{
+  flex:1;
+  overflow:auto;
+  padding:10px;
+  display:flex;
+  flex-direction:column;
+}
+
+/* BUBBLE */
+.bubble{
+  max-width:75%;
+  padding:10px 12px;
+  margin:5px 0;
+  border-radius:18px;
+  position:relative;
+  font-size:14px;
+}
+
+/* RECEIVED */
+.received{
+  align-self:flex-start;
+  background:#e5e5ea;
+  color:#000;
+}
+
+/* SENT */
+.sent{
+  align-self:flex-end;
+  background:#0b93f6;
+  color:#fff;
+}
+
+/* TIME */
+.time{
+  font-size:10px;
+  margin-top:5px;
+  opacity:.6;
+  text-align:right;
+}
+
+/* IMAGE */
+img{
+  max-width:180px;
+  border-radius:10px;
+  margin-top:5px;
+}
+
+/* INPUT */
+.input{
+  display:flex;
+  padding:10px;
+  background:#fff;
+  gap:8px;
+  border-top:1px solid #ddd;
+}
+
+.input input[type="text"]{
+  flex:1;
+  padding:10px;
+  border-radius:20px;
+  border:1px solid #ccc;
+}
+
+.send-btn{
+  background:#0b93f6;
+  color:#fff;
+  border:none;
+  padding:10px 15px;
+  border-radius:50%;
+}
+
+/* TYPING */
+.typing{
+  font-size:12px;
+  padding-left:10px;
+  color:#555;
+}
+
 </style>
 </head>
 
@@ -30,38 +131,40 @@ input{flex:1;padding:10px;border-radius:20px;border:1px solid #ccc}
 
 <div id="app" class="app">
 
+<!-- HEADER -->
 <div class="header">
-  <div>{{ username }}</div>
-  <div>{{ users }} online</div>
+  <div class="avatar">{{ username.charAt(0).toUpperCase() }}</div>
+  <div>
+    <div><b>Global Chat</b></div>
+    <div class="status">{{ users }} online</div>
+  </div>
 </div>
 
+<!-- CHAT -->
 <div class="messages" ref="msgBox">
-  <div v-for="m in chat" :class="['bubble',
-    m.type==='system'?'system':
-    m.me?'sent':'received']">
+  <div v-for="m in chat" :class="['bubble', m.me?'sent':'received']">
 
     <template v-if="m.type==='message'">
-      <b>{{ m.user }}</b><br>
       {{ m.msg }}
     </template>
 
     <template v-if="m.type==='image'">
-      <b>{{ m.user }}</b><br>
       <img :src="m.img">
     </template>
 
-    <template v-if="m.type==='system'">
-      {{ m.msg }}
-    </template>
-
+    <div class="time">{{ m.time }}</div>
   </div>
 </div>
 
-<div v-if="typingUser">{{ typingUser }} mengetik...</div>
+<div class="typing" v-if="typingUser">
+  {{ typingUser }} mengetik...
+</div>
 
+<!-- INPUT -->
 <div class="input">
   <input type="file" @change="sendImage">
-  <input v-model="message" @input="typing" @keydown.enter="send">
+  <input type="text" v-model="message" @input="typing" @keydown.enter="send" placeholder="Type a message...">
+  <button class="send-btn" @click="send">➤</button>
 </div>
 
 </div>
@@ -84,16 +187,8 @@ clientId:Math.random().toString(36)
 
 mounted(){
 if(!this.username){
-this.username=prompt("Nama kamu:");
+this.username=prompt("Masukkan nama:");
 localStorage.setItem("username",this.username);
-}
-
-if("Notification" in window){
-  Notification.requestPermission();
-}
-
-if("serviceWorker" in navigator){
-  navigator.serviceWorker.register("/sw.js");
 }
 
 this.connect();
@@ -113,26 +208,22 @@ user:this.username
 this.ws.onmessage=(e)=>{
 const d=JSON.parse(e.data);
 
-// notif
-if(document.hidden && d.type==="message"){
-new Notification(d.user+": "+d.msg);
-}
-
 // system
 if(d.type==="system"){
 this.users=d.users;
-this.chat.push(d);
 }
 
 // message
 if(d.type==="message"){
 if(d.clientId===this.clientId) return;
+d.time=new Date().toLocaleTimeString().slice(0,5);
 this.chat.push({...d,me:false});
 }
 
 // image
 if(d.type==="image"){
 if(d.clientId===this.clientId) return;
+d.time=new Date().toLocaleTimeString().slice(0,5);
 this.chat.push({...d,me:false});
 }
 
@@ -151,12 +242,17 @@ if(!this.message) return;
 
 const payload={
 type:"message",
-user:this.username,
 msg:this.message,
 clientId:this.clientId
 };
 
-this.ws.send(JSON.stringify(payload));
+this.ws.send(JSON.stringify({
+...payload,
+user:this.username
+}));
+
+payload.time=new Date().toLocaleTimeString().slice(0,5);
+
 this.chat.push({...payload,me:true});
 this.message="";
 },
@@ -170,12 +266,17 @@ const reader=new FileReader();
 reader.onload=()=>{
 const payload={
 type:"image",
-user:this.username,
 img:reader.result,
 clientId:this.clientId
 };
 
-this.ws.send(JSON.stringify(payload));
+this.ws.send(JSON.stringify({
+...payload,
+user:this.username
+}));
+
+payload.time=new Date().toLocaleTimeString().slice(0,5);
+
 this.chat.push({...payload,me:true});
 };
 
