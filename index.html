@@ -4,13 +4,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="https://unpkg.com/vue@3"></script>
 
-<style>
-body{margin:0;font-family:system-ui;background:#f2f2f2}
-.app{display:flex;flex-direction:column;height:100vh}
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0b93f6">
 
+<style>
+body{
+  margin:0;
+  font-family:system-ui;
+  background:#f2f2f2;
+  height:100vh;
+  overflow:hidden;
+}
+
+.app{
+  height:100vh;
+}
+
+/* HEADER FIX */
 .header{
-  background:#0b93f6;color:#fff;padding:12px;
-  display:flex;align-items:center;gap:10px;
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:60px;
+  background:#0b93f6;
+  color:#fff;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px;
+  z-index:10;
 }
 
 .avatar{
@@ -20,14 +43,26 @@ body{margin:0;font-family:system-ui;background:#f2f2f2}
   font-weight:bold;
 }
 
+/* CHAT SCROLL */
 .messages{
-  flex:1;overflow:auto;padding:10px;
-  display:flex;flex-direction:column;
+  position:absolute;
+  top:60px;
+  bottom:70px;
+  left:0;
+  right:0;
+  overflow-y:auto;
+  padding:10px;
+  display:flex;
+  flex-direction:column;
+  scroll-behavior:smooth;
 }
 
 .bubble{
-  max-width:75%;padding:10px;margin:5px 0;
-  border-radius:18px;font-size:14px;
+  max-width:75%;
+  padding:10px;
+  margin:5px 0;
+  border-radius:18px;
+  font-size:14px;
 }
 
 .received{align-self:flex-start;background:#e5e5ea}
@@ -37,30 +72,54 @@ body{margin:0;font-family:system-ui;background:#f2f2f2}
 
 img{max-width:180px;border-radius:10px}
 
+/* INPUT FIX */
 .input{
-  display:flex;align-items:center;padding:8px;
-  background:#fff;gap:8px;border-top:1px solid #ddd;
+  position:fixed;
+  bottom:0;
+  left:0;
+  width:100%;
+  height:70px;
+  background:#fff;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:8px;
+  border-top:1px solid #ddd;
+  z-index:10;
 }
 
 .plus{
   width:36px;height:36px;border-radius:50%;
-  background:#e5e5ea;display:flex;
-  align-items:center;justify-content:center;
+  background:#e5e5ea;
+  display:flex;align-items:center;justify-content:center;
   font-size:20px;cursor:pointer;
 }
 
 .text-input{
-  flex:1;padding:10px;border-radius:20px;border:1px solid #ccc;
+  flex:1;
+  padding:10px;
+  border-radius:20px;
+  border:1px solid #ccc;
 }
 
 .send-btn{
-  background:#0b93f6;color:#fff;border:none;
-  padding:10px 15px;border-radius:50%;
+  background:#0b93f6;
+  color:#fff;
+  border:none;
+  padding:10px 15px;
+  border-radius:50%;
 }
 
 input[type="file"]{display:none}
 
-.typing{font-size:12px;padding-left:10px;color:#555}
+.typing{
+  position:absolute;
+  bottom:75px;
+  left:10px;
+  font-size:12px;
+  color:#555;
+}
+
 .status{font-size:12px;opacity:.8}
 </style>
 </head>
@@ -69,6 +128,7 @@ input[type="file"]{display:none}
 
 <div id="app" class="app">
 
+<!-- HEADER -->
 <div class="header">
   <div class="avatar">{{ username.charAt(0).toUpperCase() }}</div>
   <div>
@@ -77,6 +137,7 @@ input[type="file"]{display:none}
   </div>
 </div>
 
+<!-- CHAT -->
 <div class="messages" ref="msgBox" @scroll="handleScroll">
   <div v-for="m in chat" :class="['bubble', m.me?'sent':'received']">
 
@@ -92,10 +153,12 @@ input[type="file"]{display:none}
   </div>
 </div>
 
+<!-- TYPING -->
 <div class="typing" v-if="typingUser">
   {{ typingUser }} mengetik...
 </div>
 
+<!-- INPUT -->
 <div class="input">
   <div class="plus" @click="openFile">+</div>
 
@@ -116,13 +179,10 @@ input[type="file"]{display:none}
 <script>
 const { createApp } = Vue;
 
-// 🔐 helper VAPID
 function urlBase64ToUint8Array(base64String){
-  const padding = "=".repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding)
-    .replace(/-/g,"+")
-    .replace(/_/g,"/");
-  const raw = atob(base64);
+  const padding="=".repeat((4-base64String.length%4)%4);
+  const base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/");
+  const raw=atob(base64);
   return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
 }
 
@@ -144,20 +204,19 @@ status:"connecting..."
 
 async mounted(){
 
-// username
 if(!this.username){
 this.username=prompt("Masukkan nama:");
 localStorage.setItem("username",this.username);
 }
 
-// 🔔 PUSH NOTIFICATION SETUP
+// PUSH NOTIF
 if("serviceWorker" in navigator){
   try{
     const reg = await navigator.serviceWorker.register("/sw.js");
 
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly:true,
-      applicationServerKey: urlBase64ToUint8Array(
+      applicationServerKey:urlBase64ToUint8Array(
         "BOr7W0h2d0z3bY7p1sV8Qk0vX6KxX7g0gQ1cKpXc1Y8q3xv5WvXK7p4Fqz9rT1X3yW5mZ0dQ8vL3ZcQ2p6Wz9yU"
       )
     });
@@ -167,8 +226,8 @@ if("serviceWorker" in navigator){
       body:JSON.stringify(sub)
     });
 
-  }catch(err){
-    console.log("Push error:",err);
+  }catch(e){
+    console.log("Push error",e);
   }
 }
 
@@ -205,26 +264,15 @@ this.status="error";
 this.ws.onmessage=(e)=>{
 const d=JSON.parse(e.data);
 
-// system
-if(d.type==="system"){
-this.users=d.users;
-}
+if(d.type==="system") this.users=d.users;
 
-// message
-if(d.type==="message"){
+if(d.type==="message"||d.type==="image"){
 if(d.clientId===this.clientId) return;
+
 d.time=new Date().toLocaleTimeString().slice(0,5);
 this.chat.push({...d,me:false});
 }
 
-// image
-if(d.type==="image"){
-if(d.clientId===this.clientId) return;
-d.time=new Date().toLocaleTimeString().slice(0,5);
-this.chat.push({...d,me:false});
-}
-
-// typing
 if(d.type==="typing"){
 this.typingUser=d.user;
 setTimeout(()=>this.typingUser="",1000);
@@ -236,7 +284,6 @@ if(this.autoScroll) this.scroll();
 };
 },
 
-// 🔥 keep alive
 startPing(){
 this.pingInterval=setInterval(()=>{
 if(this.ws && this.ws.readyState===1){
@@ -254,10 +301,7 @@ msg:this.message,
 clientId:this.clientId
 };
 
-this.ws.send(JSON.stringify({
-...payload,
-user:this.username
-}));
+this.ws.send(JSON.stringify({...payload,user:this.username}));
 
 payload.time=new Date().toLocaleTimeString().slice(0,5);
 
@@ -282,10 +326,7 @@ img:reader.result,
 clientId:this.clientId
 };
 
-this.ws.send(JSON.stringify({
-...payload,
-user:this.username
-}));
+this.ws.send(JSON.stringify({...payload,user:this.username}));
 
 payload.time=new Date().toLocaleTimeString().slice(0,5);
 
