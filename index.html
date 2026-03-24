@@ -116,6 +116,16 @@ input[type="file"]{display:none}
 <script>
 const { createApp } = Vue;
 
+// 🔐 helper VAPID
+function urlBase64ToUint8Array(base64String){
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/-/g,"+")
+    .replace(/_/g,"/");
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
+}
+
 createApp({
 data(){
 return{
@@ -132,10 +142,34 @@ status:"connecting..."
 }
 },
 
-mounted(){
+async mounted(){
+
+// username
 if(!this.username){
 this.username=prompt("Masukkan nama:");
 localStorage.setItem("username",this.username);
+}
+
+// 🔔 PUSH NOTIFICATION SETUP
+if("serviceWorker" in navigator){
+  try{
+    const reg = await navigator.serviceWorker.register("/sw.js");
+
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly:true,
+      applicationServerKey: urlBase64ToUint8Array(
+        "BOr7W0h2d0z3bY7p1sV8Qk0vX6KxX7g0gQ1cKpXc1Y8q3xv5WvXK7p4Fqz9rT1X3yW5mZ0dQ8vL3ZcQ2p6Wz9yU"
+      )
+    });
+
+    await fetch("https://chat-realtime.jihadwajib68.workers.dev/subscribe",{
+      method:"POST",
+      body:JSON.stringify(sub)
+    });
+
+  }catch(err){
+    console.log("Push error:",err);
+  }
 }
 
 this.connect();
@@ -202,7 +236,7 @@ if(this.autoScroll) this.scroll();
 };
 },
 
-// 🔥 KEEP ALIVE
+// 🔥 keep alive
 startPing(){
 this.pingInterval=setInterval(()=>{
 if(this.ws && this.ws.readyState===1){
