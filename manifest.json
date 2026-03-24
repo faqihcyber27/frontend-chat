@@ -1,0 +1,15 @@
+{
+  "name": "Realtime Chat",
+  "short_name": "Chat",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#075e54",
+  "theme_color": "#075e54",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/733/733585.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
