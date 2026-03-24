@@ -5,131 +5,63 @@
 <script src="https://unpkg.com/vue@3"></script>
 
 <style>
-body{
-  margin:0;
-  font-family:system-ui;
-  background:#f2f2f2;
-}
+body{margin:0;font-family:system-ui;background:#f2f2f2}
+.app{display:flex;flex-direction:column;height:100vh}
 
-.app{
-  display:flex;
-  flex-direction:column;
-  height:100vh;
-}
-
-/* HEADER */
 .header{
-  background:#0b93f6;
-  color:#fff;
-  padding:12px;
-  display:flex;
-  align-items:center;
-  gap:10px;
+  background:#0b93f6;color:#fff;padding:12px;
+  display:flex;align-items:center;gap:10px;
 }
 
 .avatar{
-  width:35px;
-  height:35px;
-  border-radius:50%;
-  background:#fff;
-  color:#0b93f6;
-  display:flex;
-  align-items:center;
-  justify-content:center;
+  width:35px;height:35px;border-radius:50%;
+  background:#fff;color:#0b93f6;
+  display:flex;align-items:center;justify-content:center;
   font-weight:bold;
 }
 
-/* CHAT */
 .messages{
-  flex:1;
-  overflow:auto;
-  padding:10px;
-  display:flex;
-  flex-direction:column;
+  flex:1;overflow:auto;padding:10px;
+  display:flex;flex-direction:column;
 }
 
 .bubble{
-  max-width:75%;
-  padding:10px 12px;
-  margin:5px 0;
-  border-radius:18px;
-  font-size:14px;
+  max-width:75%;padding:10px;margin:5px 0;
+  border-radius:18px;font-size:14px;
 }
 
-.received{
-  align-self:flex-start;
-  background:#e5e5ea;
-}
+.received{align-self:flex-start;background:#e5e5ea}
+.sent{align-self:flex-end;background:#0b93f6;color:#fff}
 
-.sent{
-  align-self:flex-end;
-  background:#0b93f6;
-  color:#fff;
-}
+.time{font-size:10px;opacity:.6;text-align:right}
 
-.time{
-  font-size:10px;
-  opacity:.6;
-  text-align:right;
-}
+img{max-width:180px;border-radius:10px}
 
-/* IMAGE */
-img{
-  max-width:180px;
-  border-radius:10px;
-}
-
-/* INPUT BAR */
 .input{
-  display:flex;
-  align-items:center;
-  padding:8px;
-  background:#fff;
-  gap:8px;
-  border-top:1px solid #ddd;
+  display:flex;align-items:center;padding:8px;
+  background:#fff;gap:8px;border-top:1px solid #ddd;
 }
 
-/* PLUS BUTTON */
 .plus{
-  width:36px;
-  height:36px;
-  border-radius:50%;
-  background:#e5e5ea;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:20px;
-  cursor:pointer;
+  width:36px;height:36px;border-radius:50%;
+  background:#e5e5ea;display:flex;
+  align-items:center;justify-content:center;
+  font-size:20px;cursor:pointer;
 }
 
-/* TEXT INPUT */
 .text-input{
-  flex:1;
-  padding:10px;
-  border-radius:20px;
-  border:1px solid #ccc;
+  flex:1;padding:10px;border-radius:20px;border:1px solid #ccc;
 }
 
-/* SEND BUTTON */
 .send-btn{
-  background:#0b93f6;
-  color:#fff;
-  border:none;
-  padding:10px 15px;
-  border-radius:50%;
+  background:#0b93f6;color:#fff;border:none;
+  padding:10px 15px;border-radius:50%;
 }
 
-/* HIDDEN FILE */
-input[type="file"]{
-  display:none;
-}
+input[type="file"]{display:none}
 
-/* TYPING */
-.typing{
-  font-size:12px;
-  padding-left:10px;
-  color:#555;
-}
+.typing{font-size:12px;padding-left:10px;color:#555}
+.status{font-size:12px;opacity:.8}
 </style>
 </head>
 
@@ -137,16 +69,14 @@ input[type="file"]{
 
 <div id="app" class="app">
 
-<!-- HEADER -->
 <div class="header">
   <div class="avatar">{{ username.charAt(0).toUpperCase() }}</div>
   <div>
     <div><b>Global Chat</b></div>
-    <small>{{ users }} online</small>
+    <div class="status">{{ status }} • {{ users }} online</div>
   </div>
 </div>
 
-<!-- CHAT -->
 <div class="messages" ref="msgBox" @scroll="handleScroll">
   <div v-for="m in chat" :class="['bubble', m.me?'sent':'received']">
 
@@ -166,13 +96,9 @@ input[type="file"]{
   {{ typingUser }} mengetik...
 </div>
 
-<!-- INPUT -->
 <div class="input">
-
-  <!-- PLUS -->
   <div class="plus" @click="openFile">+</div>
 
-  <!-- TEXT -->
   <input class="text-input"
     v-model="message"
     @input="typing"
@@ -180,12 +106,9 @@ input[type="file"]{
     placeholder="Type a message..."
   >
 
-  <!-- SEND -->
   <button class="send-btn" @click="send">➤</button>
 
-  <!-- HIDDEN FILE -->
   <input type="file" ref="file" @change="sendImage">
-
 </div>
 
 </div>
@@ -203,7 +126,9 @@ chat:[],
 users:0,
 typingUser:"",
 clientId:Math.random().toString(36),
-autoScroll:true
+autoScroll:true,
+pingInterval:null,
+status:"connecting..."
 }
 },
 
@@ -212,7 +137,13 @@ if(!this.username){
 this.username=prompt("Masukkan nama:");
 localStorage.setItem("username",this.username);
 }
+
 this.connect();
+this.startPing();
+},
+
+beforeUnmount(){
+clearInterval(this.pingInterval);
 },
 
 methods:{
@@ -220,10 +151,21 @@ connect(){
 this.ws=new WebSocket("wss://chat-realtime.jihadwajib68.workers.dev");
 
 this.ws.onopen=()=>{
+this.status="online";
+
 this.ws.send(JSON.stringify({
 type:"join",
 user:this.username
 }));
+};
+
+this.ws.onclose=()=>{
+this.status="reconnecting...";
+setTimeout(()=>this.connect(),2000);
+};
+
+this.ws.onerror=()=>{
+this.status="error";
 };
 
 this.ws.onmessage=(e)=>{
@@ -258,6 +200,15 @@ this.$nextTick(()=>{
 if(this.autoScroll) this.scroll();
 });
 };
+},
+
+// 🔥 KEEP ALIVE
+startPing(){
+this.pingInterval=setInterval(()=>{
+if(this.ws && this.ws.readyState===1){
+this.ws.send(JSON.stringify({type:"ping"}));
+}
+},20000);
 },
 
 send(){
@@ -311,10 +262,12 @@ reader.readAsDataURL(file);
 },
 
 typing(){
+if(this.ws.readyState===1){
 this.ws.send(JSON.stringify({
 type:"typing",
 user:this.username
 }));
+}
 },
 
 scroll(){
