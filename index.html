@@ -2,6 +2,9 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="manifest" href="manifest.json">
+
 <script src="https://unpkg.com/vue@3"></script>
 
 <style>
@@ -14,12 +17,12 @@ body{margin:0;font-family:sans-serif;background:#e5ddd5}
 .bubble{padding:8px;margin:5px;border-radius:10px;max-width:70%}
 .sent{align-self:flex-end;background:#25d366;color:#fff}
 .received{align-self:flex-start;background:#fff}
-
 .system{align-self:center;background:#ddd;font-size:12px}
 
-.input{display:flex;padding:10px;background:#fff}
-input{flex:1;padding:10px;border-radius:20px;border:1px solid #ccc}
+img{max-width:150px;border-radius:10px}
 
+.input{display:flex;padding:10px;background:#fff;gap:5px}
+input{flex:1;padding:10px;border-radius:20px;border:1px solid #ccc}
 </style>
 </head>
 
@@ -39,11 +42,15 @@ input{flex:1;padding:10px;border-radius:20px;border:1px solid #ccc}
 
     <template v-if="m.type==='message'">
       <b>{{ m.user }}</b><br>
-      {{ m.msg }}<br>
-      <small>{{ m.time }}</small>
+      {{ m.msg }}
     </template>
 
-    <template v-else>
+    <template v-if="m.type==='image'">
+      <b>{{ m.user }}</b><br>
+      <img :src="m.img">
+    </template>
+
+    <template v-if="m.type==='system'">
       {{ m.msg }}
     </template>
 
@@ -53,6 +60,7 @@ input{flex:1;padding:10px;border-radius:20px;border:1px solid #ccc}
 <div v-if="typingUser">{{ typingUser }} mengetik...</div>
 
 <div class="input">
+  <input type="file" @change="sendImage">
   <input v-model="message" @input="typing" @keydown.enter="send">
 </div>
 
@@ -79,6 +87,15 @@ if(!this.username){
 this.username=prompt("Nama kamu:");
 localStorage.setItem("username",this.username);
 }
+
+if("Notification" in window){
+  Notification.requestPermission();
+}
+
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("/sw.js");
+}
+
 this.connect();
 },
 
@@ -96,16 +113,30 @@ user:this.username
 this.ws.onmessage=(e)=>{
 const d=JSON.parse(e.data);
 
+// notif
+if(document.hidden && d.type==="message"){
+new Notification(d.user+": "+d.msg);
+}
+
+// system
 if(d.type==="system"){
 this.users=d.users;
 this.chat.push(d);
 }
 
+// message
 if(d.type==="message"){
 if(d.clientId===this.clientId) return;
 this.chat.push({...d,me:false});
 }
 
+// image
+if(d.type==="image"){
+if(d.clientId===this.clientId) return;
+this.chat.push({...d,me:false});
+}
+
+// typing
 if(d.type==="typing"){
 this.typingUser=d.user;
 setTimeout(()=>this.typingUser="",1000);
@@ -126,9 +157,29 @@ clientId:this.clientId
 };
 
 this.ws.send(JSON.stringify(payload));
-
 this.chat.push({...payload,me:true});
 this.message="";
+},
+
+sendImage(e){
+const file=e.target.files[0];
+if(!file) return;
+
+const reader=new FileReader();
+
+reader.onload=()=>{
+const payload={
+type:"image",
+user:this.username,
+img:reader.result,
+clientId:this.clientId
+};
+
+this.ws.send(JSON.stringify(payload));
+this.chat.push({...payload,me:true});
+};
+
+reader.readAsDataURL(file);
 },
 
 typing(){
