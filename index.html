@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Realtime Chat</title>
+<title>Vue Chat Realtime</title>
+
+<!-- Vue CDN -->
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 
 <style>
 :root{
@@ -24,7 +27,6 @@ body{
   height:100vh;
 }
 
-/* HEADER */
 .header{
   background:#fff;
   padding:10px;
@@ -41,7 +43,6 @@ body{
   background:#ccc;
 }
 
-/* MESSAGES */
 .messages{
   flex:1;
   overflow:auto;
@@ -76,7 +77,6 @@ body{
   opacity:.6;
 }
 
-/* INPUT */
 .input-area{
   display:flex;
   padding:10px;
@@ -97,7 +97,6 @@ button{
   border:none;
   padding:10px 15px;
   border-radius:50%;
-  cursor:pointer;
 }
 
 .name-box{
@@ -111,125 +110,115 @@ button{
   to{opacity:1}
 }
 </style>
-
-<!-- DEBUG (BIAR ERROR KELIHATAN DI HP) -->
-<script>
-window.onerror = function(msg, url, line){
-  document.body.innerHTML += "<pre style='color:red'>" + msg + "</pre>";
-};
-</script>
-
 </head>
 
 <body>
 
-<div class="container">
+<div id="app" class="container">
 
 <div class="name-box">
-  <input id="username" placeholder="Masukkan nama kamu..." />
+  <input v-model="username" placeholder="Masukkan nama kamu..." />
 </div>
 
 <div class="header">
   <div class="avatar"></div>
   <div>
     <b>Global Chat</b><br>
-    <small id="status">connecting...</small>
+    <small>{{ status }}</small>
   </div>
 </div>
 
-<div class="messages" id="messages"></div>
+<div class="messages" ref="messages">
+  <div v-for="(m,i) in chat" :key="i" :class="['bubble', m.me ? 'sent':'received']">
+    <div class="name">{{ m.user }}</div>
+    <div>{{ m.msg }}</div>
+  </div>
+</div>
 
 <div class="input-area">
-  <input id="msg" placeholder="Ketik pesan..." />
-  <button onclick="send()">➤</button>
+  <input v-model="message" @keydown.enter="send" placeholder="Ketik pesan..." />
+  <button @click="send">➤</button>
 </div>
 
 </div>
 
 <script>
-const WS_URL = "wss://chat-realtime.jihadwajib68.workers.dev";
+const { createApp } = Vue;
 
-let ws;
-const messages = document.getElementById("messages");
-const status = document.getElementById("status");
+createApp({
+  data(){
+    return{
+      ws:null,
+      status:'connecting...',
+      username:'',
+      message:'',
+      chat:[],
+      clientId: Math.random().toString(36).substring(2),
+      WS_URL: "wss://chat-realtime.jihadwajib68.workers.dev"
+    }
+  },
 
-// unique id biar gak double
-const clientId = Math.random().toString(36).substring(2);
+  mounted(){
+    this.connect();
+  },
 
-function addMessage(user, text, me=false){
-  const div = document.createElement("div");
-  div.className = "bubble " + (me ? "sent" : "received");
+  methods:{
+    connect(){
+      try{
+        this.ws = new WebSocket(this.WS_URL);
 
-  const name = document.createElement("div");
-  name.className = "name";
-  name.innerText = user;
+        this.ws.onopen = ()=> this.status='online';
+        this.ws.onclose = ()=> this.status='offline';
+        this.ws.onerror = ()=> this.status='error';
 
-  const msg = document.createElement("div");
-  msg.innerText = text;
+        this.ws.onmessage = (e)=>{
+          let data;
 
-  div.appendChild(name);
-  div.appendChild(msg);
+          try{
+            data = JSON.parse(e.data);
+          }catch{
+            data = { user:"User", msg:e.data };
+          }
 
-  messages.appendChild(div);
-  messages.scrollTop = messages.scrollHeight;
-}
+          if(data.clientId === this.clientId) return;
 
-function connect(){
-  try {
-    ws = new WebSocket(WS_URL);
+          this.chat.push({...data, me:false});
+          this.$nextTick(()=> this.scrollBottom());
+        };
 
-    ws.onopen = () => status.innerText = "online";
-    ws.onclose = () => status.innerText = "offline";
-    ws.onerror = () => status.innerText = "error";
+      }catch(err){
+        alert(err);
+      }
+    },
 
-    ws.onmessage = (e) => {
-      let data;
-
-      try {
-        data = JSON.parse(e.data);
-      } catch {
-        data = { user: "User", msg: e.data };
+    send(){
+      if(!this.username){
+        alert("Isi nama dulu!");
+        return;
       }
 
-      if(data.clientId === clientId) return;
+      if(!this.message || !this.ws || this.ws.readyState!==1) return;
 
-      addMessage(data.user, data.msg, false);
-    };
+      const payload={
+        user:this.username,
+        msg:this.message,
+        clientId:this.clientId
+      };
 
-  } catch (err) {
-    document.body.innerHTML += "<pre>"+err+"</pre>";
+      this.ws.send(JSON.stringify(payload));
+
+      this.chat.push({...payload, me:true});
+      this.message='';
+
+      this.$nextTick(()=> this.scrollBottom());
+    },
+
+    scrollBottom(){
+      const el = this.$refs.messages;
+      el.scrollTop = el.scrollHeight;
+    }
   }
-}
-
-function send(){
-  const user = document.getElementById("username").value;
-  const msg = document.getElementById("msg").value;
-
-  if(!user){
-    alert("Isi nama dulu!");
-    return;
-  }
-
-  if(!msg || !ws || ws.readyState !== 1) return;
-
-  const payload = {
-    user,
-    msg,
-    clientId
-  };
-
-  ws.send(JSON.stringify(payload));
-
-  addMessage(user, msg, true);
-  document.getElementById("msg").value = "";
-}
-
-// enter kirim
-document.getElementById("msg").addEventListener("keydown", e=>{
-  if(e.key === "Enter") send();
-});
-
-connect();
+}).mount("#app");
 </script>
 
 </body>
