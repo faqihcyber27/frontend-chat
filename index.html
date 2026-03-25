@@ -2,87 +2,68 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/vue@3"></script>
-
 </head>
 
 <body class="bg-gray-100 h-screen overflow-hidden">
 
 <div id="app" class="h-screen">
 
-<!-- HEADER -->
-<div class="fixed top-0 w-full h-14 bg-blue-500 text-white flex items-center px-3">
-  <div class="font-bold">Chat</div>
-</div>
-
 <!-- CHAT -->
 <div ref="msgBox"
-  class="absolute top-14 bottom-24 left-0 right-0 overflow-y-auto p-2 flex flex-col">
+class="absolute top-0 bottom-20 w-full overflow-y-auto p-2 flex flex-col">
 
-  <div v-for="(m,i) in chat" @click="setReply(m)"
-    :class="['max-w-[75%] p-2 my-1 rounded-xl text-sm',
-    m.me ? 'bg-blue-500 text-white self-end' : 'bg-gray-200 self-start']">
+<div v-for="m in chat"
+:class="['max-w-[75%] p-2 my-1 rounded-xl text-sm',
+m.me?'bg-blue-500 text-white self-end':'bg-gray-200']">
 
-    <div v-if="m.reply" class="text-xs opacity-70 border-l-2 pl-2 mb-1">
-      {{ m.reply.msg }}
-    </div>
+{{ m.msg }}
 
-    <template v-if="m.type==='message'">
-      {{ m.msg }}
-    </template>
+<audio v-if="m.audio" controls :src="m.audio"></audio>
 
-    <template v-if="m.type==='image'">
-      <img :src="m.img" class="max-w-[150px] rounded mt-1">
-    </template>
+<div class="text-[10px] text-right">
+{{ m.time }}
 
-    <template v-if="m.type==='audio'">
-      <audio controls :src="m.audio"></audio>
-    </template>
-
-    <div class="text-[10px] text-right mt-1">
-      {{ m.time }} <span v-if="m.me">✔✔</span>
-    </div>
-  </div>
+<span v-if="m.me">
+  {{ m.status === 'sent' ? '✔' : '' }}
+  {{ m.status === 'delivered' ? '✔✔' : '' }}
+  <span v-if="m.status==='read'" class="text-blue-200">✔✔</span>
+</span>
 
 </div>
 
-<!-- REPLY BOX -->
-<div v-if="replyMsg"
-  class="absolute bottom-24 left-0 right-0 bg-gray-200 px-3 py-1 text-sm flex justify-between">
-  <span>{{ replyMsg.msg }}</span>
-  <button @click="replyMsg=null">✖</button>
 </div>
 
-<!-- EMOJI -->
-<div v-if="showEmoji"
-  class="absolute bottom-20 bg-white w-full p-2 flex flex-wrap gap-2">
-  <span v-for="e in emojis" @click="message+=e" class="text-xl cursor-pointer">{{ e }}</span>
+</div>
+
+<!-- TYPING -->
+<div v-if="typingUser"
+class="absolute bottom-20 left-3 text-xs text-gray-500">
+{{ typingUser }} mengetik...
 </div>
 
 <!-- INPUT -->
 <div class="fixed bottom-0 w-full bg-white flex items-center gap-2 p-2">
 
-  <!-- EMOJI BTN -->
-  <button @click="toggleEmoji">😊</button>
+<textarea v-model="message"
+@input="typing"
+@keydown.enter.prevent="send"
+class="flex-1 border rounded-full px-3 py-2 resize-none"></textarea>
 
-  <!-- INPUT -->
-  <textarea v-model="message"
-    @input="autoResize"
-    @keydown.enter.prevent="handleEnter"
-    rows="1"
-    placeholder="Type..."
-    class="flex-1 border rounded-full px-3 py-2 resize-none"></textarea>
+<!-- HOLD TO RECORD -->
+<button
+@mousedown="startRecord"
+@mouseup="stopRecord"
+@touchstart="startRecord"
+@touchend="stopRecord"
+class="bg-blue-500 text-white px-4 py-2 rounded-full">
 
-  <!-- MIC / SEND -->
-  <button @click="actionBtn"
-    class="bg-blue-500 text-white px-4 py-2 rounded-full transition-all">
+<span v-if="!recording && !message">🎤</span>
+<span v-if="message">➤</span>
+<span v-if="recording">⏺</span>
 
-    <span v-if="!message">🎤</span>
-    <span v-else>➤</span>
-
-  </button>
+</button>
 
 </div>
 
@@ -97,109 +78,120 @@ return{
 ws:null,
 message:"",
 chat:[],
-replyMsg:null,
-showEmoji:false,
-emojis:["😀","😂","😍","😭","👍","🔥","😎","🙏"],
+typingUser:"",
+clientId:Math.random(),
+recording:false,
 mediaRecorder:null,
-audioChunks:[],
+chunks:[]
 }
 },
 
 mounted(){
 this.ws=new WebSocket("wss://chat-realtime.jihadwajib68.workers.dev");
 
+this.ws.onopen=()=>{
+this.ws.send(JSON.stringify({type:"join",user:"User"}));
+};
+
 this.ws.onmessage=(e)=>{
 const d=JSON.parse(e.data);
-this.chat.push(d);
-this.$nextTick(()=>this.scroll());
+
+// ACK
+if(d.type==="ack"){
+const msg=this.chat.find(x=>x.id===d.id);
+if(msg) msg.status=d.status;
+return;
+}
+
+// typing
+if(d.type==="typing"){
+this.typingUser="User";
+setTimeout(()=>this.typingUser="",1000);
+return;
+}
+
+// message/audio
+this.chat.push({...d,me:false});
+this.scroll();
 };
 },
 
 methods:{
 
-// EMOJI
-toggleEmoji(){
-this.showEmoji=!this.showEmoji;
-},
-
-// AUTO HEIGHT
-autoResize(e){
-e.target.style.height="auto";
-e.target.style.height=e.target.scrollHeight+"px";
-},
-
-// ENTER
-handleEnter(e){
-if(e.shiftKey){
-this.message+="\n";
-}else{
-this.send();
-}
-},
-
-// REPLY
-setReply(msg){
-this.replyMsg=msg;
-},
-
-// ACTION BTN
-actionBtn(){
-if(this.message){
-this.send();
-}else{
-this.recordAudio();
-}
-},
-
-// SEND MESSAGE
+// SEND
 send(){
-const payload={
+if(!this.message) return;
+
+const id=Date.now();
+
+const msg={
+id,
 type:"message",
 msg:this.message,
-reply:this.replyMsg,
-time:new Date().toLocaleTimeString().slice(0,5)
+status:"sent",
+time:new Date().toLocaleTimeString().slice(0,5),
+me:true
 };
 
-this.ws.send(JSON.stringify(payload));
-this.chat.push({...payload,me:true});
-
+this.ws.send(JSON.stringify(msg));
+this.chat.push(msg);
 this.message="";
-this.replyMsg=null;
 },
 
-// AUDIO
-async recordAudio(){
+// TYPING
+typing(){
+this.ws.send(JSON.stringify({type:"typing"}));
+},
+
+// 🎤 HOLD RECORD
+async startRecord(){
+if(this.message) return;
+
+this.recording=true;
+
 const stream=await navigator.mediaDevices.getUserMedia({audio:true});
 this.mediaRecorder=new MediaRecorder(stream);
 
 this.mediaRecorder.start();
-this.audioChunks=[];
+this.chunks=[];
 
 this.mediaRecorder.ondataavailable=e=>{
-this.audioChunks.push(e.data);
+this.chunks.push(e.data);
 };
+},
+
+stopRecord(){
+if(!this.recording) return;
+
+this.recording=false;
+
+this.mediaRecorder.stop();
 
 this.mediaRecorder.onstop=()=>{
-const blob=new Blob(this.audioChunks);
+const blob=new Blob(this.chunks);
 const url=URL.createObjectURL(blob);
 
-const payload={
+const id=Date.now();
+
+const msg={
+id,
 type:"audio",
 audio:url,
-time:new Date().toLocaleTimeString().slice(0,5)
+status:"sent",
+time:new Date().toLocaleTimeString().slice(0,5),
+me:true
 };
 
-this.ws.send(JSON.stringify(payload));
-this.chat.push({...payload,me:true});
+this.ws.send(JSON.stringify(msg));
+this.chat.push(msg);
 };
-
-// stop setelah 3 detik (demo)
-setTimeout(()=>this.mediaRecorder.stop(),3000);
 },
 
 scroll(){
+this.$nextTick(()=>{
 const el=this.$refs.msgBox;
 el.scrollTop=el.scrollHeight;
+});
 }
 
 }
