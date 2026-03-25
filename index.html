@@ -6,9 +6,6 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/vue@3"></script>
 
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0b93f6">
-
 </head>
 
 <body class="bg-gray-100 h-screen overflow-hidden">
@@ -16,68 +13,76 @@
 <div id="app" class="h-screen">
 
 <!-- HEADER -->
-<div class="fixed top-0 w-full h-14 bg-blue-500 text-white flex items-center px-3 z-10">
-  <div class="w-9 h-9 rounded-full bg-white text-blue-500 flex items-center justify-center font-bold">
-    {{ username.charAt(0).toUpperCase() }}
-  </div>
-  <div class="ml-2">
-    <div class="font-bold">Global Chat</div>
-    <div class="text-xs opacity-80">{{ status }} • {{ users }} online</div>
-  </div>
+<div class="fixed top-0 w-full h-14 bg-blue-500 text-white flex items-center px-3">
+  <div class="font-bold">Chat</div>
 </div>
 
 <!-- CHAT -->
 <div ref="msgBox"
-  class="absolute top-14 bottom-20 left-0 right-0 overflow-y-auto p-2 flex flex-col">
+  class="absolute top-14 bottom-24 left-0 right-0 overflow-y-auto p-2 flex flex-col">
 
-  <div v-for="m in chat"
+  <div v-for="(m,i) in chat" @click="setReply(m)"
     :class="['max-w-[75%] p-2 my-1 rounded-xl text-sm',
     m.me ? 'bg-blue-500 text-white self-end' : 'bg-gray-200 self-start']">
+
+    <div v-if="m.reply" class="text-xs opacity-70 border-l-2 pl-2 mb-1">
+      {{ m.reply.msg }}
+    </div>
 
     <template v-if="m.type==='message'">
       {{ m.msg }}
     </template>
 
     <template v-if="m.type==='image'">
-      <img :src="m.img" class="max-w-[180px] rounded-md mt-1">
+      <img :src="m.img" class="max-w-[150px] rounded mt-1">
     </template>
 
-    <div class="text-[10px] opacity-60 text-right mt-1">{{ m.time }}</div>
+    <template v-if="m.type==='audio'">
+      <audio controls :src="m.audio"></audio>
+    </template>
+
+    <div class="text-[10px] text-right mt-1">
+      {{ m.time }} <span v-if="m.me">✔✔</span>
+    </div>
   </div>
 
 </div>
 
-<!-- TYPING -->
-<div v-if="typingUser"
-  class="absolute bottom-20 left-3 text-xs text-gray-500">
-  {{ typingUser }} mengetik...
+<!-- REPLY BOX -->
+<div v-if="replyMsg"
+  class="absolute bottom-24 left-0 right-0 bg-gray-200 px-3 py-1 text-sm flex justify-between">
+  <span>{{ replyMsg.msg }}</span>
+  <button @click="replyMsg=null">✖</button>
+</div>
+
+<!-- EMOJI -->
+<div v-if="showEmoji"
+  class="absolute bottom-20 bg-white w-full p-2 flex flex-wrap gap-2">
+  <span v-for="e in emojis" @click="message+=e" class="text-xl cursor-pointer">{{ e }}</span>
 </div>
 
 <!-- INPUT -->
-<div class="fixed bottom-0 w-full bg-white border-t flex items-center gap-2 p-2 z-10">
+<div class="fixed bottom-0 w-full bg-white flex items-center gap-2 p-2">
 
-  <!-- PLUS -->
-  <div @click="openFile"
-    class="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-xl">
-    +
-  </div>
+  <!-- EMOJI BTN -->
+  <button @click="toggleEmoji">😊</button>
 
-  <!-- TEXTAREA -->
-  <textarea ref="input"
-    v-model="message"
+  <!-- INPUT -->
+  <textarea v-model="message"
     @input="autoResize"
     @keydown.enter.prevent="handleEnter"
     rows="1"
-    placeholder="Type a message..."
-    class="flex-1 resize-none border rounded-full px-3 py-2 max-h-32 outline-none"></textarea>
+    placeholder="Type..."
+    class="flex-1 border rounded-full px-3 py-2 resize-none"></textarea>
 
-  <!-- SEND -->
-  <button @click="send"
-    class="bg-blue-500 text-white px-4 py-2 rounded-full">
-    ➤
+  <!-- MIC / SEND -->
+  <button @click="actionBtn"
+    class="bg-blue-500 text-white px-4 py-2 rounded-full transition-all">
+
+    <span v-if="!message">🎤</span>
+    <span v-else>➤</span>
+
   </button>
-
-  <input type="file" ref="file" @change="sendImage" class="hidden">
 
 </div>
 
@@ -90,152 +95,113 @@ createApp({
 data(){
 return{
 ws:null,
-username:localStorage.getItem("username")||"",
 message:"",
 chat:[],
-users:0,
-typingUser:"",
-clientId:Math.random().toString(36),
-pingInterval:null,
-status:"connecting..."
+replyMsg:null,
+showEmoji:false,
+emojis:["😀","😂","😍","😭","👍","🔥","😎","🙏"],
+mediaRecorder:null,
+audioChunks:[],
 }
 },
 
 mounted(){
-if(!this.username){
-this.username=prompt("Masukkan nama:");
-localStorage.setItem("username",this.username);
-}
-
-this.connect();
-this.startPing();
-this.handleKeyboard();
-},
-
-methods:{
-connect(){
 this.ws=new WebSocket("wss://chat-realtime.jihadwajib68.workers.dev");
-
-this.ws.onopen=()=>{
-this.status="online";
-this.ws.send(JSON.stringify({type:"join",user:this.username}));
-};
-
-this.ws.onclose=()=>{
-this.status="reconnecting...";
-setTimeout(()=>this.connect(),2000);
-};
 
 this.ws.onmessage=(e)=>{
 const d=JSON.parse(e.data);
-
-if(d.type==="system") this.users=d.users;
-
-if(d.type==="message"||d.type==="image"){
-if(d.clientId===this.clientId) return;
-
-d.time=new Date().toLocaleTimeString().slice(0,5);
-this.chat.push({...d,me:false});
-}
-
-if(d.type==="typing"){
-this.typingUser=d.user;
-setTimeout(()=>this.typingUser="",1000);
-}
-
+this.chat.push(d);
 this.$nextTick(()=>this.scroll());
 };
 },
 
-// 🔥 AUTO HEIGHT
-autoResize(){
-const el=this.$refs.input;
-el.style.height="auto";
-el.style.height=el.scrollHeight+"px";
+methods:{
+
+// EMOJI
+toggleEmoji(){
+this.showEmoji=!this.showEmoji;
 },
 
-// ENTER HANDLING
+// AUTO HEIGHT
+autoResize(e){
+e.target.style.height="auto";
+e.target.style.height=e.target.scrollHeight+"px";
+},
+
+// ENTER
 handleEnter(e){
 if(e.shiftKey){
 this.message+="\n";
-} else {
+}else{
 this.send();
 }
 },
 
-// FIX KEYBOARD
-handleKeyboard(){
-if(window.visualViewport){
-window.visualViewport.addEventListener("resize",()=>{
-const vh=window.visualViewport.height;
-const full=window.innerHeight;
-const keyboard=full-vh;
+// REPLY
+setReply(msg){
+this.replyMsg=msg;
+},
 
-const input=document.querySelector(".fixed.bottom-0");
-
-if(keyboard>100){
-input.style.bottom=keyboard+"px";
-} else {
-input.style.bottom="0px";
-}
-});
+// ACTION BTN
+actionBtn(){
+if(this.message){
+this.send();
+}else{
+this.recordAudio();
 }
 },
 
-startPing(){
-this.pingInterval=setInterval(()=>{
-if(this.ws.readyState===1){
-this.ws.send(JSON.stringify({type:"ping"}));
-}
-},20000);
-},
-
+// SEND MESSAGE
 send(){
-if(!this.message) return;
-
 const payload={
 type:"message",
 msg:this.message,
-clientId:this.clientId
+reply:this.replyMsg,
+time:new Date().toLocaleTimeString().slice(0,5)
 };
 
-this.ws.send(JSON.stringify({...payload,user:this.username}));
-
-payload.time=new Date().toLocaleTimeString().slice(0,5);
+this.ws.send(JSON.stringify(payload));
 this.chat.push({...payload,me:true});
 
 this.message="";
-this.$refs.input.style.height="auto";
+this.replyMsg=null;
 },
 
-openFile(){
-this.$refs.file.click();
-},
+// AUDIO
+async recordAudio(){
+const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+this.mediaRecorder=new MediaRecorder(stream);
 
-sendImage(e){
-const file=e.target.files[0];
-if(!file) return;
+this.mediaRecorder.start();
+this.audioChunks=[];
 
-const reader=new FileReader();
-
-reader.onload=()=>{
-const payload={
-type:"image",
-img:reader.result,
-clientId:this.clientId
+this.mediaRecorder.ondataavailable=e=>{
+this.audioChunks.push(e.data);
 };
 
-this.ws.send(JSON.stringify({...payload,user:this.username}));
+this.mediaRecorder.onstop=()=>{
+const blob=new Blob(this.audioChunks);
+const url=URL.createObjectURL(blob);
+
+const payload={
+type:"audio",
+audio:url,
+time:new Date().toLocaleTimeString().slice(0,5)
+};
+
+this.ws.send(JSON.stringify(payload));
 this.chat.push({...payload,me:true});
 };
 
-reader.readAsDataURL(file);
+// stop setelah 3 detik (demo)
+setTimeout(()=>this.mediaRecorder.stop(),3000);
 },
 
 scroll(){
 const el=this.$refs.msgBox;
 el.scrollTop=el.scrollHeight;
 }
+
 }
 }).mount("#app");
 </script>
