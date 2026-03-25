@@ -4,174 +4,99 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="https://unpkg.com/vue@3"></script>
 
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0b93f6">
-
 <style>
-body{
-  margin:0;
-  font-family:system-ui;
-  background:#f2f2f2;
-  height:100vh;
-  overflow:hidden;
-}
-
-.app{
-  height:100vh;
-}
+body{margin:0;font-family:system-ui;background:#f2f2f2;height:100vh;overflow:hidden}
+.app{height:100vh;display:flex;flex-direction:column}
 
 /* HEADER FIX */
 .header{
-  position:fixed;
-  top:0;
-  left:0;
-  width:100%;
-  height:60px;
-  background:#0b93f6;
-  color:#fff;
-  display:flex;
-  align-items:center;
-  gap:10px;
-  padding:10px;
-  z-index:10;
+  position:fixed;top:0;left:0;width:100%;height:60px;
+  background:#0b93f6;color:#fff;display:flex;align-items:center;gap:10px;padding:10px;z-index:10
 }
-
-.avatar{
-  width:35px;height:35px;border-radius:50%;
-  background:#fff;color:#0b93f6;
-  display:flex;align-items:center;justify-content:center;
-  font-weight:bold;
-}
+.avatar{width:35px;height:35px;border-radius:50%;background:#fff;color:#0b93f6;display:flex;align-items:center;justify-content:center;font-weight:bold}
 
 /* CHAT SCROLL */
-.messages{
-  position:absolute;
-  top:60px;
-  bottom:70px;
-  left:0;
-  right:0;
-  overflow-y:auto;
-  padding:10px;
-  display:flex;
-  flex-direction:column;
-  scroll-behavior:smooth;
-}
-
-.bubble{
-  max-width:75%;
-  padding:10px;
-  margin:5px 0;
-  border-radius:18px;
-  font-size:14px;
-}
-
+.messages{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;scroll-behavior:smooth;margin-top:60px;margin-bottom:70px}
+.bubble{max-width:75%;padding:10px;margin:5px 0;border-radius:18px;font-size:14px}
 .received{align-self:flex-start;background:#e5e5ea}
 .sent{align-self:flex-end;background:#0b93f6;color:#fff}
-
 .time{font-size:10px;opacity:.6;text-align:right}
-
-img{max-width:180px;border-radius:10px}
 
 /* INPUT FIX */
 .input{
-  position:fixed;
-  bottom:0;
-  left:0;
-  width:100%;
-  height:70px;
-  background:#fff;
-  display:flex;
-  align-items:center;
-  gap:8px;
-  padding:8px;
-  border-top:1px solid #ddd;
-  z-index:10;
+  position:fixed;bottom:0;left:0;width:100%;height:70px;background:#fff;display:flex;align-items:center;gap:8px;padding:8px;border-top:1px solid #ddd;z-index:10
 }
+.text-input{flex:1;padding:10px;border-radius:20px;border:1px solid #ccc}
+.send-btn{background:#0b93f6;color:#fff;border:none;padding:10px 15px;border-radius:50%}
 
-.plus{
-  width:36px;height:36px;border-radius:50%;
-  background:#e5e5ea;
-  display:flex;align-items:center;justify-content:center;
-  font-size:20px;cursor:pointer;
-}
-
-.text-input{
-  flex:1;
-  padding:10px;
-  border-radius:20px;
-  border:1px solid #ccc;
-}
-
-.send-btn{
-  background:#0b93f6;
-  color:#fff;
-  border:none;
-  padding:10px 15px;
-  border-radius:50%;
-}
-
-input[type="file"]{display:none}
-
-.typing{
-  position:absolute;
-  bottom:75px;
-  left:10px;
-  font-size:12px;
-  color:#555;
-}
-
-.status{font-size:12px;opacity:.8}
+.screen{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:20px}
+.button{padding:10px 15px;margin:5px;border:none;border-radius:10px;background:#0b93f6;color:#fff;cursor:pointer;width:80%}
+.friend-item{display:flex;justify-content:space-between;align-items:center;padding:5px 10px;margin:5px;background:#fff;border-radius:10px;width:90%}
 </style>
 </head>
 
 <body>
-
 <div id="app" class="app">
 
 <!-- HEADER -->
-<div class="header">
-  <div class="avatar">{{ username.charAt(0).toUpperCase() }}</div>
+<div class="header" v-if="user">
+  <div class="avatar">{{ user.name.charAt(0).toUpperCase() }}</div>
   <div>
-    <div><b>Global Chat</b></div>
-    <div class="status">{{ status }} • {{ users }} online</div>
+    <div><b>{{ currentRoomName || "Global Chat" }}</b></div>
+    <div class="time">{{ status }}</div>
   </div>
 </div>
 
-<!-- CHAT -->
-<div class="messages" ref="msgBox" @scroll="handleScroll">
-  <div v-for="m in chat" :class="['bubble', m.me?'sent':'received']">
-
-    <template v-if="m.type==='message'">
-      {{ m.msg }}
-    </template>
-
-    <template v-if="m.type==='image'">
-      <img :src="m.img">
-    </template>
-
-    <div class="time">{{ m.time }}</div>
-  </div>
+<!-- LOGIN / REGISTER SCREEN -->
+<div class="screen" v-if="!user">
+  <h2>Register / Login</h2>
+  <input v-model="tempUserId" placeholder="User ID" />
+  <input v-model="tempName" placeholder="Name" />
+  <button class="button" @click="register">Register</button>
+  <button class="button" @click="login">Login</button>
 </div>
 
-<!-- TYPING -->
-<div class="typing" v-if="typingUser">
-  {{ typingUser }} mengetik...
+<!-- MAIN MENU -->
+<div class="screen" v-if="user && !activeScreen">
+  <h3>Welcome, {{ user.name }}</h3>
+  <button class="button" @click="activeScreen='friends'">Add / List Friends</button>
+  <button class="button" @click="activeScreen='chat'">Chat</button>
+  <button class="button" @click="activeScreen='updatePhoto'">Update Profile Photo</button>
+</div>
+
+<!-- UPDATE PHOTO SCREEN -->
+<div class="screen" v-if="activeScreen==='updatePhoto'">
+  <h3>Update Profile Photo</h3>
+  <input v-model="tempPhoto" placeholder="Photo URL" />
+  <button class="button" @click="updatePhoto">Save Photo</button>
+  <button class="button" @click="activeScreen=''">Back</button>
+</div>
+
+<!-- FRIENDS SCREEN -->
+<div class="screen" v-if="activeScreen==='friends'">
+  <h3>Add Friend</h3>
+  <input v-model="friendIdInput" placeholder="Friend User ID" />
+  <button class="button" @click="addFriend">Add Friend</button>
+  <h3>Friends List</h3>
+  <div v-for="f in friends" class="friend-item">
+    <span>{{ f }}</span>
+    <button @click="startChat(f)">Chat</button>
+  </div>
+  <button class="button" @click="activeScreen=''">Back</button>
+</div>
+
+<!-- CHAT SCREEN -->
+<div v-if="activeScreen==='chat'" class="messages" ref="msgBox">
+  <div v-for="m in chat" :class="['bubble', m.senderId===user.userId?'sent':'received']">
+    {{ m.msg }}
+    <div class="time">{{ formatTime(m.time) }}</div>
+  </div>
 </div>
 
 <!-- INPUT -->
-<div class="input">
-  <div class="plus" @click="openFile">+</div>
-
-  <input class="text-input"
-    v-model="message"
-    @input="typing"
-    @keydown.enter="send"
-    placeholder="Type a message..."
-  >
-
-  <button class="send-btn" @click="send">➤</button>
-
-  <input type="file" ref="file" @change="sendImage">
+<div class="input" v-if="activeScreen==='chat'">
+  <input class="text-input" v-model="message" @keydown.enter="sendMessage" placeholder="Type a message..." />
+  <button class="send-btn" @click="sendMessage">➤</button>
 </div>
 
 </div>
@@ -179,184 +104,128 @@ input[type="file"]{display:none}
 <script>
 const { createApp } = Vue;
 
-function urlBase64ToUint8Array(base64String){
-  const padding="=".repeat((4-base64String.length%4)%4);
-  const base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/");
-  const raw=atob(base64);
-  return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
-}
-
 createApp({
 data(){
-return{
-ws:null,
-username:localStorage.getItem("username")||"",
-message:"",
-chat:[],
-users:0,
-typingUser:"",
-clientId:Math.random().toString(36),
-autoScroll:true,
-pingInterval:null,
-status:"connecting..."
-}
-},
-
-async mounted(){
-
-if(!this.username){
-this.username=prompt("Masukkan nama:");
-localStorage.setItem("username",this.username);
-}
-
-// PUSH NOTIF
-if("serviceWorker" in navigator){
-  try{
-    const reg = await navigator.serviceWorker.register("/sw.js");
-
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly:true,
-      applicationServerKey:urlBase64ToUint8Array(
-        "BOr7W0h2d0z3bY7p1sV8Qk0vX6KxX7g0gQ1cKpXc1Y8q3xv5WvXK7p4Fqz9rT1X3yW5mZ0dQ8vL3ZcQ2p6Wz9yU"
-      )
-    });
-
-    await fetch("https://chat-realtime.jihadwajib68.workers.dev/subscribe",{
-      method:"POST",
-      body:JSON.stringify(sub)
-    });
-
-  }catch(e){
-    console.log("Push error",e);
+  return{
+    user:null,
+    tempUserId:"",
+    tempName:"",
+    tempPhoto:"",
+    friendIdInput:"",
+    friends:[],
+    activeScreen:"",
+    chat:[],
+    message:"",
+    ws:null,
+    currentRoom:"",
+    currentRoomName:"",
+    status:""
   }
-}
-
-this.connect();
-this.startPing();
 },
-
-beforeUnmount(){
-clearInterval(this.pingInterval);
-},
-
 methods:{
-connect(){
-this.ws=new WebSocket("wss://chat-realtime.jihadwajib68.workers.dev");
-
-this.ws.onopen=()=>{
-this.status="online";
-
-this.ws.send(JSON.stringify({
-type:"join",
-user:this.username
-}));
-};
-
-this.ws.onclose=()=>{
-this.status="reconnecting...";
-setTimeout(()=>this.connect(),2000);
-};
-
-this.ws.onerror=()=>{
-this.status="error";
-};
-
-this.ws.onmessage=(e)=>{
-const d=JSON.parse(e.data);
-
-if(d.type==="system") this.users=d.users;
-
-if(d.type==="message"||d.type==="image"){
-if(d.clientId===this.clientId) return;
-
-d.time=new Date().toLocaleTimeString().slice(0,5);
-this.chat.push({...d,me:false});
-}
-
-if(d.type==="typing"){
-this.typingUser=d.user;
-setTimeout(()=>this.typingUser="",1000);
-}
-
-this.$nextTick(()=>{
-if(this.autoScroll) this.scroll();
-});
-};
-},
-
-startPing(){
-this.pingInterval=setInterval(()=>{
-if(this.ws && this.ws.readyState===1){
-this.ws.send(JSON.stringify({type:"ping"}));
-}
-},20000);
-},
-
-send(){
-if(!this.message) return;
-
-const payload={
-type:"message",
-msg:this.message,
-clientId:this.clientId
-};
-
-this.ws.send(JSON.stringify({...payload,user:this.username}));
-
-payload.time=new Date().toLocaleTimeString().slice(0,5);
-
-this.chat.push({...payload,me:true});
-this.message="";
-},
-
-openFile(){
-this.$refs.file.click();
-},
-
-sendImage(e){
-const file=e.target.files[0];
-if(!file) return;
-
-const reader=new FileReader();
-
-reader.onload=()=>{
-const payload={
-type:"image",
-img:reader.result,
-clientId:this.clientId
-};
-
-this.ws.send(JSON.stringify({...payload,user:this.username}));
-
-payload.time=new Date().toLocaleTimeString().slice(0,5);
-
-this.chat.push({...payload,me:true});
-};
-
-reader.readAsDataURL(file);
-},
-
-typing(){
-if(this.ws.readyState===1){
-this.ws.send(JSON.stringify({
-type:"typing",
-user:this.username
-}));
-}
-},
-
-scroll(){
-const el=this.$refs.msgBox;
-el.scrollTop=el.scrollHeight;
-},
-
-handleScroll(){
-const el=this.$refs.msgBox;
-this.autoScroll = el.scrollTop + el.clientHeight >= el.scrollHeight - 50;
-}
+  async register(){
+    if(!this.tempUserId || !this.tempName) return alert("User ID & Name required");
+    try{
+      const res = await fetch("/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+        userId:this.tempUserId,name:this.tempName,photoUrl:""
+      })});
+      if(res.ok){
+        alert("Registered! You can login now.");
+      } else {
+        const text = await res.text();
+        alert(text);
+      }
+    }catch(e){console.log(e)}
+  },
+  async login(){
+    if(!this.tempUserId) return alert("User ID required");
+    try{
+      const res = await fetch("/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({userId:this.tempUserId})});
+      if(res.ok){
+        this.user = await res.json();
+        this.loadFriends();
+      } else {
+        alert("User not found");
+      }
+    }catch(e){console.log(e)}
+  },
+  async updatePhoto(){
+    if(!this.tempPhoto) return alert("Enter photo URL");
+    try{
+      const res = await fetch("/update-photo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+        userId:this.user.userId,photoUrl:this.tempPhoto
+      })});
+      if(res.ok){
+        alert("Photo updated!");
+        this.user.photoUrl=this.tempPhoto;
+        this.tempPhoto="";
+        this.activeScreen="";
+      } else alert("Error updating photo");
+    }catch(e){console.log(e)}
+  },
+  async addFriend(){
+    if(!this.friendIdInput) return;
+    const res = await fetch("/add-friend",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+      userId:this.user.userId,friendId:this.friendIdInput
+    })});
+    if(res.ok){
+      alert("Friend added!");
+      this.friendIdInput="";
+      this.loadFriends();
+    } else alert("Error adding friend");
+  },
+  async loadFriends(){
+    const res = await fetch(`/friends/${this.user.userId}`);
+    if(res.ok){
+      this.friends = await res.json();
+    }
+  },
+  startChat(friendId){
+    this.currentRoom = [this.user.userId,friendId].sort().join("_");
+    this.currentRoomName = friendId;
+    this.chat=[];
+    this.activeScreen='chat';
+    this.connectWS();
+    this.loadHistory();
+  },
+  async loadHistory(){
+    const res = await fetch(`/chat/${this.currentRoom}`);
+    if(res.ok){
+      this.chat = await res.json();
+      this.scrollChat();
+    }
+  },
+  connectWS(){
+    if(this.ws) this.ws.close();
+    this.ws = new WebSocket(`wss://YOUR_WORKER_DOMAIN/chat/${this.currentRoom}`);
+    this.ws.onopen=()=>{this.status="Connected";}
+    this.ws.onmessage=(e)=>{
+      const msg=JSON.parse(e.data);
+      this.chat.push(msg);
+      this.scrollChat();
+    };
+    this.ws.onclose=()=>{this.status="Disconnected";}
+  },
+  sendMessage(){
+    if(!this.message) return;
+    const payload={roomId:this.currentRoom,senderId:this.user.userId,msg:this.message,type:"message",to:this.currentRoomName};
+    this.ws.send(JSON.stringify(payload));
+    this.chat.push({...payload});
+    this.message="";
+    this.scrollChat();
+  },
+  scrollChat(){
+    this.$nextTick(()=>{
+      const el=this.$refs.msgBox;
+      if(el) el.scrollTop=el.scrollHeight;
+    });
+  },
+  formatTime(t){
+    const d = new Date(t);
+    return d.toLocaleTimeString().slice(0,5);
+  }
 }
 }).mount("#app");
 </script>
-
 </body>
 </html>
