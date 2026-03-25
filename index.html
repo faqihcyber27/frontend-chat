@@ -2,101 +2,83 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/vue@3"></script>
 
-<style>
-body{margin:0;font-family:system-ui;background:#f2f2f2;height:100vh;overflow:hidden}
-.app{height:100vh;display:flex;flex-direction:column}
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0b93f6">
 
-/* HEADER FIX */
-.header{
-  position:fixed;top:0;left:0;width:100%;height:60px;
-  background:#0b93f6;color:#fff;display:flex;align-items:center;gap:10px;padding:10px;z-index:10
-}
-.avatar{width:35px;height:35px;border-radius:50%;background:#fff;color:#0b93f6;display:flex;align-items:center;justify-content:center;font-weight:bold}
-
-/* CHAT SCROLL */
-.messages{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;scroll-behavior:smooth;margin-top:60px;margin-bottom:70px}
-.bubble{max-width:75%;padding:10px;margin:5px 0;border-radius:18px;font-size:14px}
-.received{align-self:flex-start;background:#e5e5ea}
-.sent{align-self:flex-end;background:#0b93f6;color:#fff}
-.time{font-size:10px;opacity:.6;text-align:right}
-
-/* INPUT FIX */
-.input{
-  position:fixed;bottom:0;left:0;width:100%;height:70px;background:#fff;display:flex;align-items:center;gap:8px;padding:8px;border-top:1px solid #ddd;z-index:10
-}
-.text-input{flex:1;padding:10px;border-radius:20px;border:1px solid #ccc}
-.send-btn{background:#0b93f6;color:#fff;border:none;padding:10px 15px;border-radius:50%}
-
-.screen{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:20px}
-.button{padding:10px 15px;margin:5px;border:none;border-radius:10px;background:#0b93f6;color:#fff;cursor:pointer;width:80%}
-.friend-item{display:flex;justify-content:space-between;align-items:center;padding:5px 10px;margin:5px;background:#fff;border-radius:10px;width:90%}
-</style>
 </head>
 
-<body>
-<div id="app" class="app">
+<body class="bg-gray-100 h-screen overflow-hidden">
+
+<div id="app" class="h-screen">
 
 <!-- HEADER -->
-<div class="header" v-if="user">
-  <div class="avatar">{{ user.name.charAt(0).toUpperCase() }}</div>
-  <div>
-    <div><b>{{ currentRoomName || "Global Chat" }}</b></div>
-    <div class="time">{{ status }}</div>
+<div class="fixed top-0 w-full h-14 bg-blue-500 text-white flex items-center px-3 z-10">
+  <div class="w-9 h-9 rounded-full bg-white text-blue-500 flex items-center justify-center font-bold">
+    {{ username.charAt(0).toUpperCase() }}
+  </div>
+  <div class="ml-2">
+    <div class="font-bold">Global Chat</div>
+    <div class="text-xs opacity-80">{{ status }} • {{ users }} online</div>
   </div>
 </div>
 
-<!-- LOGIN / REGISTER SCREEN -->
-<div class="screen" v-if="!user">
-  <h2>Register / Login</h2>
-  <input v-model="tempUserId" placeholder="User ID" />
-  <input v-model="tempName" placeholder="Name" />
-  <button class="button" @click="register">Register</button>
-  <button class="button" @click="login">Login</button>
-</div>
+<!-- CHAT -->
+<div ref="msgBox"
+  class="absolute top-14 bottom-20 left-0 right-0 overflow-y-auto p-2 flex flex-col">
 
-<!-- MAIN MENU -->
-<div class="screen" v-if="user && !activeScreen">
-  <h3>Welcome, {{ user.name }}</h3>
-  <button class="button" @click="activeScreen='friends'">Add / List Friends</button>
-  <button class="button" @click="activeScreen='chat'">Chat</button>
-  <button class="button" @click="activeScreen='updatePhoto'">Update Profile Photo</button>
-</div>
+  <div v-for="m in chat"
+    :class="['max-w-[75%] p-2 my-1 rounded-xl text-sm',
+    m.me ? 'bg-blue-500 text-white self-end' : 'bg-gray-200 self-start']">
 
-<!-- UPDATE PHOTO SCREEN -->
-<div class="screen" v-if="activeScreen==='updatePhoto'">
-  <h3>Update Profile Photo</h3>
-  <input v-model="tempPhoto" placeholder="Photo URL" />
-  <button class="button" @click="updatePhoto">Save Photo</button>
-  <button class="button" @click="activeScreen=''">Back</button>
-</div>
+    <template v-if="m.type==='message'">
+      {{ m.msg }}
+    </template>
 
-<!-- FRIENDS SCREEN -->
-<div class="screen" v-if="activeScreen==='friends'">
-  <h3>Add Friend</h3>
-  <input v-model="friendIdInput" placeholder="Friend User ID" />
-  <button class="button" @click="addFriend">Add Friend</button>
-  <h3>Friends List</h3>
-  <div v-for="f in friends" class="friend-item">
-    <span>{{ f }}</span>
-    <button @click="startChat(f)">Chat</button>
+    <template v-if="m.type==='image'">
+      <img :src="m.img" class="max-w-[180px] rounded-md mt-1">
+    </template>
+
+    <div class="text-[10px] opacity-60 text-right mt-1">{{ m.time }}</div>
   </div>
-  <button class="button" @click="activeScreen=''">Back</button>
+
 </div>
 
-<!-- CHAT SCREEN -->
-<div v-if="activeScreen==='chat'" class="messages" ref="msgBox">
-  <div v-for="m in chat" :class="['bubble', m.senderId===user.userId?'sent':'received']">
-    {{ m.msg }}
-    <div class="time">{{ formatTime(m.time) }}</div>
-  </div>
+<!-- TYPING -->
+<div v-if="typingUser"
+  class="absolute bottom-20 left-3 text-xs text-gray-500">
+  {{ typingUser }} mengetik...
 </div>
 
 <!-- INPUT -->
-<div class="input" v-if="activeScreen==='chat'">
-  <input class="text-input" v-model="message" @keydown.enter="sendMessage" placeholder="Type a message..." />
-  <button class="send-btn" @click="sendMessage">➤</button>
+<div class="fixed bottom-0 w-full bg-white border-t flex items-center gap-2 p-2 z-10">
+
+  <!-- PLUS -->
+  <div @click="openFile"
+    class="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-xl">
+    +
+  </div>
+
+  <!-- TEXTAREA -->
+  <textarea ref="input"
+    v-model="message"
+    @input="autoResize"
+    @keydown.enter.prevent="handleEnter"
+    rows="1"
+    placeholder="Type a message..."
+    class="flex-1 resize-none border rounded-full px-3 py-2 max-h-32 outline-none"></textarea>
+
+  <!-- SEND -->
+  <button @click="send"
+    class="bg-blue-500 text-white px-4 py-2 rounded-full">
+    ➤
+  </button>
+
+  <input type="file" ref="file" @change="sendImage" class="hidden">
+
 </div>
 
 </div>
@@ -106,126 +88,157 @@ const { createApp } = Vue;
 
 createApp({
 data(){
-  return{
-    user:null,
-    tempUserId:"",
-    tempName:"",
-    tempPhoto:"",
-    friendIdInput:"",
-    friends:[],
-    activeScreen:"",
-    chat:[],
-    message:"",
-    ws:null,
-    currentRoom:"",
-    currentRoomName:"",
-    status:""
-  }
+return{
+ws:null,
+username:localStorage.getItem("username")||"",
+message:"",
+chat:[],
+users:0,
+typingUser:"",
+clientId:Math.random().toString(36),
+pingInterval:null,
+status:"connecting..."
+}
 },
+
+mounted(){
+if(!this.username){
+this.username=prompt("Masukkan nama:");
+localStorage.setItem("username",this.username);
+}
+
+this.connect();
+this.startPing();
+this.handleKeyboard();
+},
+
 methods:{
-  async register(){
-    if(!this.tempUserId || !this.tempName) return alert("User ID & Name required");
-    try{
-      const res = await fetch("/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-        userId:this.tempUserId,name:this.tempName,photoUrl:""
-      })});
-      if(res.ok){
-        alert("Registered! You can login now.");
-      } else {
-        const text = await res.text();
-        alert(text);
-      }
-    }catch(e){console.log(e)}
-  },
-  async login(){
-    if(!this.tempUserId) return alert("User ID required");
-    try{
-      const res = await fetch("/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({userId:this.tempUserId})});
-      if(res.ok){
-        this.user = await res.json();
-        this.loadFriends();
-      } else {
-        alert("User not found");
-      }
-    }catch(e){console.log(e)}
-  },
-  async updatePhoto(){
-    if(!this.tempPhoto) return alert("Enter photo URL");
-    try{
-      const res = await fetch("/update-photo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-        userId:this.user.userId,photoUrl:this.tempPhoto
-      })});
-      if(res.ok){
-        alert("Photo updated!");
-        this.user.photoUrl=this.tempPhoto;
-        this.tempPhoto="";
-        this.activeScreen="";
-      } else alert("Error updating photo");
-    }catch(e){console.log(e)}
-  },
-  async addFriend(){
-    if(!this.friendIdInput) return;
-    const res = await fetch("/add-friend",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-      userId:this.user.userId,friendId:this.friendIdInput
-    })});
-    if(res.ok){
-      alert("Friend added!");
-      this.friendIdInput="";
-      this.loadFriends();
-    } else alert("Error adding friend");
-  },
-  async loadFriends(){
-    const res = await fetch(`/friends/${this.user.userId}`);
-    if(res.ok){
-      this.friends = await res.json();
-    }
-  },
-  startChat(friendId){
-    this.currentRoom = [this.user.userId,friendId].sort().join("_");
-    this.currentRoomName = friendId;
-    this.chat=[];
-    this.activeScreen='chat';
-    this.connectWS();
-    this.loadHistory();
-  },
-  async loadHistory(){
-    const res = await fetch(`/chat/${this.currentRoom}`);
-    if(res.ok){
-      this.chat = await res.json();
-      this.scrollChat();
-    }
-  },
-  connectWS(){
-    if(this.ws) this.ws.close();
-    this.ws = new WebSocket(`wss://YOUR_WORKER_DOMAIN/chat/${this.currentRoom}`);
-    this.ws.onopen=()=>{this.status="Connected";}
-    this.ws.onmessage=(e)=>{
-      const msg=JSON.parse(e.data);
-      this.chat.push(msg);
-      this.scrollChat();
-    };
-    this.ws.onclose=()=>{this.status="Disconnected";}
-  },
-  sendMessage(){
-    if(!this.message) return;
-    const payload={roomId:this.currentRoom,senderId:this.user.userId,msg:this.message,type:"message",to:this.currentRoomName};
-    this.ws.send(JSON.stringify(payload));
-    this.chat.push({...payload});
-    this.message="";
-    this.scrollChat();
-  },
-  scrollChat(){
-    this.$nextTick(()=>{
-      const el=this.$refs.msgBox;
-      if(el) el.scrollTop=el.scrollHeight;
-    });
-  },
-  formatTime(t){
-    const d = new Date(t);
-    return d.toLocaleTimeString().slice(0,5);
-  }
+connect(){
+this.ws=new WebSocket("wss://chat-realtime.jihadwajib68.workers.dev");
+
+this.ws.onopen=()=>{
+this.status="online";
+this.ws.send(JSON.stringify({type:"join",user:this.username}));
+};
+
+this.ws.onclose=()=>{
+this.status="reconnecting...";
+setTimeout(()=>this.connect(),2000);
+};
+
+this.ws.onmessage=(e)=>{
+const d=JSON.parse(e.data);
+
+if(d.type==="system") this.users=d.users;
+
+if(d.type==="message"||d.type==="image"){
+if(d.clientId===this.clientId) return;
+
+d.time=new Date().toLocaleTimeString().slice(0,5);
+this.chat.push({...d,me:false});
+}
+
+if(d.type==="typing"){
+this.typingUser=d.user;
+setTimeout(()=>this.typingUser="",1000);
+}
+
+this.$nextTick(()=>this.scroll());
+};
+},
+
+// 🔥 AUTO HEIGHT
+autoResize(){
+const el=this.$refs.input;
+el.style.height="auto";
+el.style.height=el.scrollHeight+"px";
+},
+
+// ENTER HANDLING
+handleEnter(e){
+if(e.shiftKey){
+this.message+="\n";
+} else {
+this.send();
+}
+},
+
+// FIX KEYBOARD
+handleKeyboard(){
+if(window.visualViewport){
+window.visualViewport.addEventListener("resize",()=>{
+const vh=window.visualViewport.height;
+const full=window.innerHeight;
+const keyboard=full-vh;
+
+const input=document.querySelector(".fixed.bottom-0");
+
+if(keyboard>100){
+input.style.bottom=keyboard+"px";
+} else {
+input.style.bottom="0px";
+}
+});
+}
+},
+
+startPing(){
+this.pingInterval=setInterval(()=>{
+if(this.ws.readyState===1){
+this.ws.send(JSON.stringify({type:"ping"}));
+}
+},20000);
+},
+
+send(){
+if(!this.message) return;
+
+const payload={
+type:"message",
+msg:this.message,
+clientId:this.clientId
+};
+
+this.ws.send(JSON.stringify({...payload,user:this.username}));
+
+payload.time=new Date().toLocaleTimeString().slice(0,5);
+this.chat.push({...payload,me:true});
+
+this.message="";
+this.$refs.input.style.height="auto";
+},
+
+openFile(){
+this.$refs.file.click();
+},
+
+sendImage(e){
+const file=e.target.files[0];
+if(!file) return;
+
+const reader=new FileReader();
+
+reader.onload=()=>{
+const payload={
+type:"image",
+img:reader.result,
+clientId:this.clientId
+};
+
+this.ws.send(JSON.stringify({...payload,user:this.username}));
+this.chat.push({...payload,me:true});
+};
+
+reader.readAsDataURL(file);
+},
+
+scroll(){
+const el=this.$refs.msgBox;
+el.scrollTop=el.scrollHeight;
+}
 }
 }).mount("#app");
 </script>
+
 </body>
 </html>
